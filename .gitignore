@@ -1,0 +1,62 @@
+# --- Nautilus Parquet data catalogs -----------------------------------------
+# Reproducible from the downloaders + loading notebooks. ~106 GB combined.
+project/nautilusDataCatalog/
+project/nautilusPremiumCatalog/
+**/nautilusDataCatalog/
+**/nautilusPremiumCatalog/
+
+# Any other catalog-shaped output
+*.parquet
+catalog/
+*Catalog/
+
+# --- Raw downloaded market data ---------------------------------------------
+raw/
+csv/
+download_manifest.csv
+*.csv.gz
+*.part
+
+# --- Virtual environments ---------------------------------------------------
+nautilusVenv/
+venv/
+.venv/
+env/
+
+# --- Secrets / local config -------------------------------------------------
+*.env
+!*.env.example
+.envrc
+
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Notebooks --------------------------------------------------------------
+.ipynb_checkpoints/
+
+# --- Logs / Nautilus runtime output -----------------------------------------
+logs/
+*.log
+nautilus_log/
+
+# --- Local tooling state ----------------------------------------------------
+.claude/settings.local.json
+
+# --- OS / editor ------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+.idea/
+.vscode/

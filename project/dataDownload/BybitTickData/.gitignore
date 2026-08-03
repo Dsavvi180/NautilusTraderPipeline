@@ -1,0 +1,5 @@
+# Downloaded market data can be huge.
+raw/
+csv/
+download_manifest.csv
+*.part
