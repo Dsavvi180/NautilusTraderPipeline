@@ -33,6 +33,8 @@ The reasoning is that a solo trader competes against firms whose advantage is as
 
 The objective of this repository is therefore to remove the software-level failure modes entirely, so that when a strategy fails it is because the hypothesis was wrong rather than because the pipeline misreported reality. What remains is a clean surface on which to test whether an edge genuinely exists.
 
+The second requirement is throughput. Retail platforms are built around OHLCV candles, because candles are small and easy to serve; the market microstructure that actually drives short-horizon prediction is discarded before the user ever sees it. This pipeline instead ingests and replays the full record — every executed trade and every incremental L2 order book update, roughly 106 GB for a single instrument — at a scale normally associated with a professional desk. Strategies can be researched on that data and then run live against the same event stream, so a model trained on order book state is not forced to trade on a summarised view of it.
+
 Development is deliberately AI-assisted. Specification, review and implementation are carried out in collaboration with language models, which lets one person maintain a codebase and research programme that would conventionally need a team — on the condition that every architectural decision is understood and justified rather than delegated.
 
 ---
@@ -40,6 +42,8 @@ Development is deliberately AI-assisted. Specification, review and implementatio
 ## Design principles
 
 **One code path for research and production.** The engine is event-driven throughout: data arrives as a stream of timestamped events and every component reacts to them, much like a message queue feeding a set of subscribers. A feature computed event-by-event over historical data therefore executes identically against a live feed. There is no second implementation to drift out of sync with the first, which removes a whole class of deployment bug.
+
+**Full order book depth, in research and in production.** The engine treats L2 order book deltas as first-class events rather than a pre-aggregated snapshot, so a strategy can reconstruct the book state at any point in history and subscribe to the identical event type live. This is what makes microstructure features — queue imbalance, depth-weighted pressure, liquidity withdrawal ahead of a move — available to a model at all. Most retail infrastructure cannot express them, because it never carries the data that defines them.
 
 **Sampling follows market activity, not the clock.** The default in finance is to summarise trades into fixed intervals — one row per minute, per hour. This is a poor design choice statistically. Market activity is extremely bursty, so a fixed interval samples heavily from quiet periods and sparsely from the volatile periods that carry the information. The resulting series has heavy tails and time-varying variance, violating the assumptions most models rest on.
 
