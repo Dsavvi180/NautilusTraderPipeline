@@ -1,35 +1,44 @@
 # NautilusTraderPipeline
 
-A research and execution pipeline for crypto perpetuals, built on [NautilusTrader](https://github.com/nautechsystems/nautilus_trader) — a Rust-native trading engine driven from Python. Venue is Bybit; the working instrument is ETHUSDT perpetual.
+An institutional-grade research and execution pipeline for crypto perpetual futures, built on [NautilusTrader](https://github.com/nautechsystems/nautilus_trader) — a Rust-native trading engine driven from Python. Venue is Bybit; the primary instrument is ETHUSDT perpetual.
 
-The point of the whole thing is that the code which researches a strategy is the same code that trades it. Nautilus is event-driven end to end, so a feature computed tick-by-tick in a backtest runs identically against a live socket. No reimplementation, no drift between research and production.
-
-**Where it stands:** data ingestion, catalog construction and the backtest harness work. Bar-sampling research is underway. Live execution is not built yet.
+**Status:** data ingestion, catalog construction and the backtest harness are operational. Bar-sampling research is in progress. Live execution is not yet implemented.
 
 ---
 
-## The idea
+## Purpose
 
-Most backtests start with OHLCV candles because that is what exchanges hand you. That is a poor starting point. Fixed time intervals sample the market at a constant rate regardless of what is happening in it — a minute during a liquidation cascade gets the same weight as a minute at 4am. The resulting returns are fat-tailed and heteroscedastic, which is exactly the wrong input for most statistical models.
+This is infrastructure for a single operator running machine-learning strategies in crypto markets, engineered to the standard a desk would expect rather than the standard a retail toolkit provides.
 
-Sampling by traded *activity* instead of by the clock largely fixes this. Close a bar every N units of volume and the bar rate naturally speeds up when information is flowing and slows down when it is not. Returns come out far closer to IID Gaussian — a result that goes back to Clark (1973) and Ané & Geman (2000), and is the basis for López de Prado's treatment of bar types in *Advances in Financial Machine Learning*.
+The reasoning is that a solo trader competes against firms whose advantage is as much operational as analytical. Their edge does not survive silent look-ahead in a backtest, timestamp drift between research and production, or a fill model that flatters a strategy which would not have filled. Those are software problems, not market problems, and they are solvable with sufficient discipline in the engineering.
 
-So this pipeline is built around volume and dollar bars rather than candles, and the ingestion layer keeps raw trade ticks so bars can be rebuilt at any threshold rather than being locked to one.
+The objective of this repository is therefore to eliminate the software-level failure modes entirely, so that when a strategy fails it is because the hypothesis was wrong and not because the pipeline lied. What remains is a clean surface on which to test whether an edge actually exists.
 
-Two constraints shape everything else:
-
-- **The Nautilus event loop is single-threaded.** Anything expensive — model training, Monte Carlo filters — has to run outside it as a side job and feed results back in, rather than being parallelised inside it.
-- **The tick catalog is ~81 GB against 24 GB of RAM.** Every pass over history streams day by day or in tick chunks. Nothing ever loads whole.
+Development is deliberately AI-assisted. Specification, review and implementation are carried out in collaboration with language models, which allows a single person to maintain a codebase and a research programme that would conventionally require a team — provided every architectural decision is understood and justified rather than delegated.
 
 ---
 
-## How data moves
+## Design principles
+
+**Research and production share one code path.** NautilusTrader is event-driven throughout, so a feature computed tick-by-tick against historical data executes identically against a live socket. There is no separate backtest implementation to diverge from the live one, which removes an entire category of deployment risk.
+
+**Sampling follows market activity, not the clock.** Fixed time intervals weight a minute of liquidation cascade identically to a minute of overnight inactivity, producing returns that are fat-tailed and heteroscedastic — poorly suited to statistical modelling. Sampling by traded volume instead lets the bar rate accelerate with information flow, yielding returns materially closer to IID Gaussian (Clark, 1973; Ané & Geman, 2000; López de Prado, 2018, ch. 2). The pipeline is built on volume and dollar bars, and retains raw trade ticks so bars can be rebuilt at any threshold rather than being fixed to one.
+
+**The event loop is single-threaded.** Computationally expensive work — model training, Monte Carlo filtering — runs as an external side job and returns its output to the loop as custom data, rather than being parallelised inside it.
+
+**Nothing loads whole.** The tick catalog is approximately 81 GB against 24 GB of available memory. Every pass over history streams by day or in tick chunks, carrying only the state required across boundaries.
+
+**Integrity takes precedence over convenience.** Simplicity is preferred, but never at the cost of data integrity, execution integrity or the correctness of strategy logic.
+
+---
+
+## Architecture
 
 ```text
 Bybit public endpoints
-        ↓                      async downloaders, resumable, no API key
+        ↓                      async downloaders — resumable, no API key required
    raw CSV on disk
-        ↓                      parse, normalise, ms → ns timestamps
+        ↓                      parse, normalise, millisecond → nanosecond timestamps
   ParquetDataCatalog           ticks · order book L2 · 1m bars · funding · instrument
         ↓                      BacktestNode streams ticks through the engine
     volume bars                aggregated tick-by-tick, written back to the same catalog
@@ -37,26 +46,26 @@ Bybit public endpoints
   strategy backtests
 ```
 
-There is no database. The Parquet catalog *is* the store, laid out the way Nautilus wants to read it, and everything downstream loads from a single `catalog_path`.
+There is no external database. The Parquet catalog is the store, structured for Nautilus ingestion, and every downstream component resolves from a single `catalog_path` — including the instrument definition the bars depend on.
 
 ---
 
-## What's in here
+## Repository structure
 
 | | |
 | :--- | :--- |
-| `project/dataDownload/` | Four standalone async downloaders — tick, order book, kline/premium-kline, funding rate. Each resumable, each with its own CLI and README. |
-| `project/dataLoadingPipeline/` | One notebook per data type, turning raw files into Nautilus objects and writing them to the catalog. |
-| `project/backtestingPipeline/` | `centralNode.py` (the backtest harness), the volume-bar aggregation node, and the bar-sampling research notebooks. |
-| `project/utils/getInstrument.py` | Pulls live contract specs from Bybit rather than hard-coding tick sizes and lot steps that change without warning. |
-| `project/liveDataPipeline/` | Placeholder for live execution. Empty for now. |
-| `project/progressionRoadmap.md` | The five-phase plan, from offline feature cataloging to live ML inference. |
+| `project/dataDownload/` | Four independent async downloaders — trade tick, order book, kline and premium kline, funding rate. Each resumable, each with its own CLI and documentation. |
+| `project/dataLoadingPipeline/` | One notebook per data type, converting raw exchange files into Nautilus objects and writing them to the catalog. |
+| `project/backtestingPipeline/` | The backtest harness (`centralNode.py`), the volume-bar aggregation node, and the bar-sampling research. |
+| `project/utils/getInstrument.py` | Retrieves live contract specifications from the Bybit V5 API rather than hard-coding tick sizes, lot steps and margin parameters that the venue revises without notice. |
+| `project/liveDataPipeline/` | Reserved for the live execution client. Not yet implemented. |
+| `project/progressionRoadmap.md` | Five-phase development plan, from offline feature cataloging through to live ML inference. |
 
-The Parquet catalogs are not in the repo — ~106 GB of them. They rebuild deterministically from the downloaders plus the loading notebooks.
+The Parquet catalogs are excluded from version control — approximately 106 GB. They reconstruct deterministically from the downloaders and loading notebooks given the same date range.
 
 ---
 
-## Getting started
+## Operation
 
 ```bash
 python3 -m venv nautilusVenv && source nautilusVenv/bin/activate
@@ -64,18 +73,18 @@ pip install -r requirements.txt
 echo 'DATA_DIR="/path/to/raw/data"' > project/nautilus.env
 ```
 
-**1. Download.** Each script is independent and skips what it already has:
+**1. Acquire data.** Each downloader runs independently and skips files already present:
 
 ```bash
 python project/dataDownload/BybitTickData/download_bybit_tick_data_async.py \
     --symbols ETHUSDT --start 2020-10-21 --end 2026-06-28 --concurrency 6
 ```
 
-**2. Ingest.** Run the matching notebook in `dataLoadingPipeline/`. It fetches the instrument definition from Bybit, then converts and writes raw files into the catalog in date order.
+**2. Ingest.** Run the corresponding notebook in `dataLoadingPipeline/`. It resolves the instrument definition from Bybit, then converts and writes raw files into the catalog in strict date order. The order book notebook verifies continuity across file boundaries; the catalog is only as trustworthy as that check.
 
-**3. Build bars.** `barDownload.ipynb` streams ticks through a `BacktestNode` and lets the engine's aggregator build volume bars the same way it would live, then writes them back beside the ticks. A full run over the tick history takes hours — test on a short window first. The notebook refuses to run if the output folder already exists, since a second run would silently append duplicates.
+**3. Aggregate bars.** `barDownload.ipynb` streams ticks through a `BacktestNode` and allows the engine's own aggregator to construct volume bars via the same event-driven path used in live trading, then persists them alongside the ticks. A full pass over the tick history runs for several hours, so validate on a constrained window first. The notebook aborts if the output directory already exists, since a repeat run would silently append duplicate bars.
 
-**4. Backtest.** `BacktestRunner` wraps the venue, data and engine config behind defaults, so you only supply the actor you are working on:
+**4. Backtest.** `BacktestRunner` encapsulates venue, data and engine configuration behind defaults, requiring only the actor under development:
 
 ```python
 runner = BacktestRunner(
@@ -86,25 +95,27 @@ runner = BacktestRunner(
 results = runner.run()
 ```
 
----
-
-## What the bar research found
-
-`volumeBarStatisticalAnalysis.ipynb` and `dollarBarStatisticalAnalysis.ipynb` compare fixed thresholds against thresholds recalibrated daily from trailing volume. Three things came out of it that are easy to get wrong:
-
-**Ranking bars by kurtosis is a trap.** Excess kurtosis falls monotonically as the threshold grows, so picking the minimum always returns the largest bar in the grid. That is a property of the metric, not a discovery about the market. The right question is which is the *fastest* bar that is normal enough, so the notebooks select against a tolerance instead.
-
-**Adaptive thresholds cut against the reason activity bars work.** Holding bars-per-day constant is a form of adaptation, and activity bars are normal precisely *because* they accelerate when the market does. Damping that partially undoes the benefit. Both notebooks quantify the trade-off rather than assuming a winner.
-
-**Look-ahead hides in the bar boundaries.** Backfilling the warm-up window would set past thresholds from future volume — and because boundaries propagate into every feature and label built on them, that is the worst possible place for a leak. The cold-start days are dropped instead.
+Defaults: Bybit venue, NETTING OMS, margin account, and the venue's published maker and taker fees resolved through `GetInstrument`.
 
 ---
 
-## Where it's going
+## Bar sampling research
 
-Deployment target is AWS: S3 as the permanent data lake, ECR for the research image, EC2 spun up only when compute is needed, and a small always-on node for live trading once a strategy justifies it. Detail in [`project/aws_nautilus_research_architecture.md`](project/aws_nautilus_research_architecture.md).
+`volumeBarStatisticalAnalysis.ipynb` and `dollarBarStatisticalAnalysis.ipynb` evaluate fixed thresholds against thresholds recalibrated daily from trailing volume. Three findings materially affect how bars should be specified.
 
-The strategy roadmap runs through offline feature cataloging → live feature ingress over ZeroMQ → triple-barrier labeling and meta-classifiers → state-space filters → production ML inference. The architectural through-line is keeping heavy computation outside the loop and deterministic execution inside it.
+**Excess kurtosis is not a valid selection criterion in isolation.** It declines monotonically as the threshold increases, so minimising it necessarily returns the largest specification in the grid. This is a property of the estimator, not evidence about the market. The operative question is which is the fastest bar that remains sufficiently Gaussian, so selection is made against a tolerance rather than by argmin.
+
+**Adaptive thresholds work against the mechanism that makes activity bars effective.** Holding bars-per-day constant is itself a form of adaptation, and activity sampling recovers normality precisely because it accelerates when information flow accelerates. Damping that response partially forfeits the benefit. Both notebooks quantify the trade-off rather than presuming an outcome.
+
+**Look-ahead bias concentrates in the bar boundaries.** Backfilling the warm-up window would derive historical thresholds from future volume. Because boundaries propagate into every feature and label constructed on them, this is the most damaging location for a leak, so the cold-start period is discarded rather than reconstructed.
+
+---
+
+## Roadmap
+
+The deployment target is AWS: S3 as the permanent data lake, ECR holding the research image, EC2 provisioned only when compute is required, and a small persistent node for live execution once a strategy justifies it. Specification in [`project/aws_nautilus_research_architecture.md`](project/aws_nautilus_research_architecture.md).
+
+The strategy programme proceeds through offline feature cataloging, live feature ingress over a ZeroMQ bridge, triple-barrier labeling with meta-classification, state-space filtering, and finally production ML inference in the execution path. The architectural constant throughout is the separation of heavy computation, which runs externally, from deterministic low-latency execution, which runs inside the loop.
 
 ---
 
@@ -112,5 +123,5 @@ The strategy roadmap runs through offline feature cataloging → live feature in
 
 - Clark, P. K. (1973). "A Subordinated Stochastic Process Model with Finite Variance for Speculative Prices." *Econometrica* 41(1).
 - Ané, T. & Geman, H. (2000). "Order Flow, Transaction Clock, and Normality of Asset Returns." *Journal of Finance* 55(5).
-- Easley, D., López de Prado, M. & O'Hara, M. (2012). "The Volume Clock." *Journal of Portfolio Management* 39(1).
+- Easley, D., López de Prado, M. & O'Hara, M. (2012). "The Volume Clock: Insights into the High-Frequency Paradigm." *Journal of Portfolio Management* 39(1).
 - López de Prado, M. (2018). *Advances in Financial Machine Learning*. Wiley.
