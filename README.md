@@ -2,7 +2,7 @@
 
 A research and execution pipeline for automated crypto trading, built on [NautilusTrader](https://github.com/nautechsystems/nautilus_trader) — a Rust trading engine driven from Python.
 
-In software terms: an ETL layer that turns ~100 GB of raw exchange records into a columnar store, a resampling layer that converts those records into model-ready observations, and a deterministic replay engine that runs a strategy over historical data using the same code path it will later use against a live socket.
+In software terms: an ETL layer that turns ~300 GB of raw exchange records into a columnar (Parquet) store, a resampling layer that converts those records into model-ready observations, and a deterministic replay engine that runs a strategy over historical data using the same code path it will later use against a live socket.
 
 Venue is [Bybit](https://www.bybit.com); the instrument is the ETHUSDT perpetual future. **Status:** ingestion, storage and backtesting work. Sampling research is in progress. Live execution is not yet built.
 
