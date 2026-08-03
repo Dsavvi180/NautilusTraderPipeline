@@ -65,7 +65,7 @@ Bybit public endpoints
   strategy backtests
 ```
 
-There is no database. Storage is a directory of Parquet files partitioned the way the engine reads them, so every downstream component resolves from a single path — including the contract specification the bars depend on. For an append-only, read-heavy, single-writer workload, a columnar file layout is simpler and faster than a database, and it ports directly to object storage later.
+There is no database. Storage is a directory of Parquet files partitioned the way the engine reads them, so every downstream component resolves from a single path — including the contract specification the bars depend on. For an append-only, read-heavy, single-writer workload, a columnar file layout is simpler and faster than a database, and it ports directly to cloud object storage later.
 
 ---
 
