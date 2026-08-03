@@ -6,6 +6,8 @@ In software terms: an ETL layer that turns ~300 GB of raw exchange records into 
 
 Venue is [Bybit](https://www.bybit.com); the instrument is the ETHUSDT perpetual future. **Status:** ingestion, storage and backtesting work. Sampling research is in progress. Live execution is not yet built.
 
+**Personal Note**: I am building this algorithmic trading pipeline to facilitate my goals of independent, but AI-assisted, algorithmic trading in decentralised financial markets. The aim is to develop a professional-grade pipeline, made possible by the heavy lifiting done in Rust by the Nautilus Trader Software, allowing me to reliably research and deploy algorithmic trading strategies on a trustworthy platform that mitigates software-level errors. This pipeline will also facilitate my 2-year Master of Informatics dissertation project at The University of Edinburgh in Machine Learning for Algorithmic Trading on The Blockchain.
+
 ---
 
 ## Vocabulary
@@ -75,12 +77,12 @@ There is no database. Storage is a directory of Parquet files partitioned the wa
 | :--- | :--- |
 | `project/dataDownload/` | Four independent async downloaders — trades, order book, price bars, funding rates. Each resumable and independently documented. |
 | `project/dataLoadingPipeline/` | One notebook per data type, converting raw exchange files into engine objects and writing them to the store. |
-| `project/backtestingPipeline/` | The backtest harness (`centralNode.py`), the bar aggregation job, and the sampling research. |
+| `project/backtestingPipeline/` | The backtest node (`centralNode.py`), the bar aggregation job, and the sampling research. |
 | `project/utils/getInstrument.py` | Fetches contract specifications from the exchange API at runtime instead of hard-coding values such as minimum price increment and order size, which the venue revises without notice. |
 | `project/liveDataPipeline/` | Reserved for the live execution client. Not yet implemented. |
 | `project/progressionRoadmap.md` | Five-phase development plan. |
 
-The Parquet store is excluded from version control — roughly 106 GB. It rebuilds deterministically from the downloaders and loading notebooks given the same date range.
+The Parquet store is excluded from version control — roughly 106 GB for only ETH data. It rebuilds deterministically from the downloaders and loading notebooks given the same date range.
 
 ---
 
