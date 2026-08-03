@@ -6,7 +6,7 @@ In software terms: an ETL layer that turns ~300 GB of raw exchange records into 
 
 Venue is [Bybit](https://www.bybit.com); the instrument is the ETHUSDT perpetual future. **Status:** ingestion, storage and backtesting work. Sampling research is in progress. Live execution is not yet built.
 
-**Personal Note**: I am building this algorithmic trading pipeline to facilitate my goals of independent, but AI-assisted, algorithmic trading in decentralised financial markets. The aim is to develop a professional-grade pipeline, made possible by the heavy lifiting done in Rust by the Nautilus Trader Software, allowing me to reliably research and deploy algorithmic trading strategies on a trustworthy platform that mitigates software-level errors. This pipeline will also facilitate my 2-year Master of Informatics dissertation project at The University of Edinburgh in Machine Learning for Algorithmic Trading on The Blockchain.
+**Personal note.** I am building this pipeline to support independent, AI-assisted algorithmic trading in crypto-asset markets. The aim is a professional-grade research and execution platform — made practical by the heavy lifting NautilusTrader does in Rust — on which strategies can be developed and deployed without software-level defects corrupting the results. It also forms the engineering foundation for my two-year MInf dissertation at the University of Edinburgh on machine learning for algorithmic trading in crypto markets.
 
 ---
 
